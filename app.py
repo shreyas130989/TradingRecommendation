@@ -31,7 +31,9 @@ with st.expander("Advanced (optional)"):
             hi = lo = None
 
 tf_label = st.radio("Which swing?", ["Long-term (weekly, multi-year base)",
-                                     "Short-term (daily, recent leg)"], horizontal=False)
+                                     "Short-term (daily, recent leg)"], index=0, horizontal=False,
+                    help="Long-term matches most names in the broker's list (e.g. CAKE); "
+                         "Short-term matches the QCOM-style report.")
 timeframe = "long" if tf_label.startswith("Long") else "short"
 run = st.button("Get report", type="primary", use_container_width=True)
 

@@ -115,29 +115,39 @@ def zigzag_pivots(df: pd.DataFrame, pct: float = ZIGZAG_PCT):
     return pivots
 
 
-def breakout_base(df: pd.DataFrame, base_years: int = 3, pct: float = 0.10):
+def breakout_base(df: pd.DataFrame, run_pct: float = 0.05, ceiling_years: int = 2,
+                  base_years: int = 2):
     """
-    Long-term anchor for a stock that has broken out of a multi-year base
-    (the CAKE case: BOA 82 = old ceiling, SL2 38 = base low, CMP 109 above both).
+    Long-term anchor for a stock that has broken out of a base
+    (the CAKE case: BOA 82 = ceiling before the July surge, SL2 38 = base low).
 
-    Ceiling = the most recent ZigZag pivot high (default 10% on weekly bars) that
-    was a record high at the time and that price has since broken above.
-    Base low = lowest low in the `base_years` before that ceiling.
-    Returns (high_date, ceiling, low_date, base_low) or None if no such breakout.
+    Run start = the last ZigZag pivot low (run_pct, weekly) before the recent peak.
+    Ceiling   = highest high in the `ceiling_years` up to that pivot low, i.e. the
+                level price had to clear to break out.
+    Base low  = lowest low in the `base_years` before the ceiling bar.
+    Only used when today's close is above the ceiling.
+    Returns (high_date, ceiling, low_date, base_low) or None.
     """
+    if len(df) < 60:
+        return None
     cmp_ = float(df["Close"].iloc[-1])
-    piv = zigzag_pivots(df, pct)
-    run_max = df["High"].cummax()
-    for d, price, kind in reversed(piv[:-1]):         # skip the live, unconfirmed extreme
-        if kind != "H" or price >= cmp_:
-            continue
-        if price < run_max.loc[d] * 0.98:              # was not a record high then
-            continue
-        start = d - pd.Timedelta(days=365 * base_years)
-        base = df.loc[(df.index >= start) & (df.index <= d)]
-        low_i = base["Low"].idxmin()
-        return d, float(price), low_i, float(base.loc[low_i, "Low"])
-    return None
+    peak_i = df["High"].idxmax()
+    piv = [p for p in zigzag_pivots(df, run_pct) if p[2] == "L" and p[0] < peak_i]
+    if not piv:
+        return None
+    run_start = piv[-1][0]
+    win = df.loc[(df.index >= run_start - pd.Timedelta(days=365 * ceiling_years)) &
+                 (df.index <= run_start)]
+    if win.empty:
+        return None
+    ceiling_i = win["High"].idxmax()
+    ceiling = float(win.loc[ceiling_i, "High"])
+    if cmp_ <= ceiling:
+        return None                                    # still inside the base
+    base = df.loc[(df.index >= ceiling_i - pd.Timedelta(days=365 * base_years)) &
+                  (df.index <= ceiling_i)]
+    low_i = base["Low"].idxmin()
+    return ceiling_i, ceiling, low_i, float(base.loc[low_i, "Low"])
 
 
 def last_down_leg(pivots):
