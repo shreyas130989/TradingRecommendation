@@ -18,8 +18,9 @@ st.caption("Reverse-engineered template, not the academy's method, not financial
 ticker = st.text_input("Ticker", placeholder="e.g. QCOM").strip().upper()
 
 with st.expander("Advanced (optional)"):
-    zz = st.slider("Swing sensitivity (ZigZag %)", 3, 15, 8,
-                   help="Smaller = picks smaller, more recent swings") / 100
+    zz_on = st.checkbox("Override swing sensitivity")
+    zz = st.slider("ZigZag reversal %", 3, 40, 25 if zz_on else 8,
+                   help="Smaller = smaller, more recent swings") / 100 if zz_on else None
     manual = st.checkbox("Set the swing anchors myself")
     hi = lo = None
     if manual:
@@ -29,6 +30,9 @@ with st.expander("Advanced (optional)"):
         if not hi or not lo:
             hi = lo = None
 
+tf_label = st.radio("Which swing?", ["Long-term (weekly, multi-year base)",
+                                     "Short-term (daily, recent leg)"], horizontal=False)
+timeframe = "long" if tf_label.startswith("Long") else "short"
 run = st.button("Get report", type="primary", use_container_width=True)
 
 
@@ -40,7 +44,7 @@ if run and ticker:
     fl.ZIGZAG_PCT = zz
     try:
         with st.spinner(f"Fetching {ticker}…"):
-            res = fl.analyse(ticker, hi, lo)
+            res = fl.analyse(ticker, hi, lo, timeframe)
     except Exception as e:
         st.error(f"Could not analyse {ticker}: {e}")
         st.stop()
